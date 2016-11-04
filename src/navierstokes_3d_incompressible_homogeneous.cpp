@@ -23,30 +23,10 @@
 //-----------------------------------------------------------------------el-
 
 #include <masa_internal.h>
-
-#include <ad_masa.h>
-
-
-
-// Private methods declarations
-template <typename Scalar, typename Scalar2>
-Scalar helper_f(Scalar2 beta, Scalar2 kx, Scalar x);
-
-template <typename Scalar, typename Scalar2>
-Scalar helper_g(Scalar2 delta, Scalar2 ky, Scalar y);
-  
-template <typename Scalar, typename Scalar2>
-Scalar helper_h(Scalar2 gamma, Scalar2 kz, Scalar z);
-
-
-
-typedef ShadowNumber<double, long double> RawScalar;
-const unsigned int NDIM = 3;
-typedef DualNumber<RawScalar, NumberArray<NDIM, RawScalar> > FirstDerivType;
-typedef DualNumber<FirstDerivType, NumberArray<NDIM, FirstDerivType> > SecondDerivType;
-typedef SecondDerivType ADType;
+#include <cmath>
 
 using namespace MASA;
+using namespace std;
 
 template <typename Scalar>
 MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::navierstokes_3d_incompressible_homogeneous()
@@ -97,119 +77,170 @@ int MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::init_var()
 
 // u component of velocity source term
 template <typename Scalar>
-Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_u(Scalar x1, Scalar y1, Scalar z1)
+Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_u(Scalar x, Scalar y, Scalar z)
 {
-  typedef DualNumber<Scalar, NumberArray<NDIM, Scalar> > FirstDerivType;
-  typedef DualNumber<FirstDerivType, NumberArray<NDIM, FirstDerivType> > SecondDerivType;
-  typedef DualNumber<SecondDerivType, NumberArray<NDIM, SecondDerivType> > ThirdDerivType;
-  typedef ThirdDerivType ADScalar;
-
-  // Treat velocity as a vector
-  NumberArray<NDIM, ADScalar> U;
-
-  ADScalar x = ADScalar(x1,NumberArrayUnitVector<NDIM, 0, Scalar>::value());
-  ADScalar y = ADScalar(y1,NumberArrayUnitVector<NDIM, 1, Scalar>::value());
-  ADScalar z = ADScalar(z1,NumberArrayUnitVector<NDIM, 2, Scalar>::value());
-
-  // Arbitrary manufactured solutions
-  U[0]       = a * helper_f(beta,kx,x)                  * helper_g(delta,ky,y).derivatives()[1] * helper_h(gamma,kz,z).derivatives()[2];
-  U[1]       = b * helper_f(beta,kx,x).derivatives()[0] * helper_g(delta,ky,y)                  * helper_h(gamma,kz,z).derivatives()[2];
-  U[2]       = c * helper_f(beta,kx,x).derivatives()[0] * helper_g(delta,ky,y).derivatives()[1] * helper_h(gamma,kz,z);
-  ADScalar P = d * helper_f(beta,kx,x)                  * helper_g(delta,ky,y)                  * helper_h(gamma,kz,z);
-
   // NS equation residuals
-  NumberArray<NDIM, Scalar> Q_u = 
-    raw_value(
+  Scalar Q_u = 
+    (2.*pow(a,2)*kx*pow(ky,2)*pow(kz,2)*cos(kx*x)*pow(cos(ky*y),2)*
+      pow(cos(kz*z),2))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),4)) + 
+   (3.*a*b*kx*pow(ky,2)*pow(kz,2)*cos(kx*x)*pow(cos(ky*y),2)*
+      pow(cos(kz*z),2))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),4)) + 
+   (3.*a*c*kx*pow(ky,2)*pow(kz,2)*cos(kx*x)*pow(cos(ky*y),2)*
+      pow(cos(kz*z),2))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),4)) + 
+   (1.*a*b*kx*pow(ky,2)*pow(kz,2)*cos(kx*x)*pow(cos(kz*z),2)*
+      sin(ky*y))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),4)) + 
+   (1.*a*c*kx*pow(ky,2)*pow(kz,2)*cos(kx*x)*pow(cos(ky*y),2)*
+      sin(kz*z))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),3)) + 
+   (1.*d*kx*cos(kx*x))/
+    (pow(beta + sin(kx*x),2)*(delta + sin(ky*y))*(gamma + sin(kz*z))) + 
+   nu*((6.*a*ky*pow(kz,3)*cos(ky*y)*pow(cos(kz*z),3))/
+       ((beta + sin(kx*x))*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),4)) + 
+      (6.*a*ky*pow(kz,3)*cos(ky*y)*cos(kz*z)*sin(kz*z))/
+       ((beta + sin(kx*x))*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),3)) + 
+      (6.*a*pow(ky,3)*kz*pow(cos(ky*y),3)*cos(kz*z))/
+       ((beta + sin(kx*x))*pow(delta + sin(ky*y),4)*
+         pow(gamma + sin(kz*z),2)) + 
+      (6.*a*pow(ky,3)*kz*cos(ky*y)*cos(kz*z)*sin(ky*y))/
+       ((beta + sin(kx*x))*pow(delta + sin(ky*y),3)*
+         pow(gamma + sin(kz*z),2)) + 
+      (2.*a*pow(kx,2)*ky*kz*pow(cos(kx*x),2)*cos(ky*y)*cos(kz*z))/
+       (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),2)) + 
+      (1.*a*pow(kx,2)*ky*kz*cos(ky*y)*cos(kz*z)*sin(kx*x))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),2)) - 
+      (1.*a*pow(ky,3)*kz*cos(ky*y)*cos(kz*z))/
+       ((beta + sin(kx*x))*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),2)) - 
+      (1.*a*ky*pow(kz,3)*cos(ky*y)*cos(kz*z))/
+       ((beta + sin(kx*x))*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),2)));
 
-	      // convective term
-	      -divergence(U.outerproduct(U))
-
-	      // pressure
-	      - P.derivatives()
-
-	      // dissipation
-	      + nu * divergence(gradient(U)));
-
-  return -Q_u[0];
-
+  return -Q_u;
 }
 
 // v component of velocity source term
 template <typename Scalar>
-Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_v(Scalar x1, Scalar y1, Scalar z1)
+Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_v(Scalar x, Scalar y, Scalar z)
 {
-  typedef DualNumber<Scalar, NumberArray<NDIM, Scalar> > FirstDerivType;
-  typedef DualNumber<FirstDerivType, NumberArray<NDIM, FirstDerivType> > SecondDerivType;
-  typedef DualNumber<SecondDerivType, NumberArray<NDIM, SecondDerivType> > ThirdDerivType;
-  typedef ThirdDerivType ADScalar;
+    Scalar Q_v = 
+    (3.*a*b*pow(kx,2)*ky*pow(kz,2)*pow(cos(kx*x),2)*cos(ky*y)*
+      pow(cos(kz*z),2))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),4)) + 
+   (2.*pow(b,2)*pow(kx,2)*ky*pow(kz,2)*pow(cos(kx*x),2)*cos(ky*y)*
+      pow(cos(kz*z),2))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),4)) + 
+   (3.*b*c*pow(kx,2)*ky*pow(kz,2)*pow(cos(kx*x),2)*cos(ky*y)*
+      pow(cos(kz*z),2))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),4)) + 
+   (1.*a*b*pow(kx,2)*ky*pow(kz,2)*cos(ky*y)*pow(cos(kz*z),2)*
+      sin(kx*x))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),4)) + 
+   (1.*b*c*pow(kx,2)*ky*pow(kz,2)*pow(cos(kx*x),2)*cos(ky*y)*
+      sin(kz*z))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),3)) + 
+   (1.*d*ky*cos(ky*y))/
+    ((beta + sin(kx*x))*pow(delta + sin(ky*y),2)*(gamma + sin(kz*z))) + 
+   nu*((6.*b*kx*pow(kz,3)*cos(kx*x)*pow(cos(kz*z),3))/
+       (pow(beta + sin(kx*x),2)*(delta + sin(ky*y))*
+         pow(gamma + sin(kz*z),4)) + 
+      (6.*b*kx*pow(kz,3)*cos(kx*x)*cos(kz*z)*sin(kz*z))/
+       (pow(beta + sin(kx*x),2)*(delta + sin(ky*y))*
+         pow(gamma + sin(kz*z),3)) + 
+      (2.*b*kx*pow(ky,2)*kz*cos(kx*x)*pow(cos(ky*y),2)*cos(kz*z))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),3)*
+         pow(gamma + sin(kz*z),2)) + 
+      (1.*b*kx*pow(ky,2)*kz*cos(kx*x)*cos(kz*z)*sin(ky*y))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),2)) + 
+      (6.*b*pow(kx,3)*kz*pow(cos(kx*x),3)*cos(kz*z))/
+       (pow(beta + sin(kx*x),4)*(delta + sin(ky*y))*
+         pow(gamma + sin(kz*z),2)) + 
+      (6.*b*pow(kx,3)*kz*cos(kx*x)*cos(kz*z)*sin(kx*x))/
+       (pow(beta + sin(kx*x),3)*(delta + sin(ky*y))*
+         pow(gamma + sin(kz*z),2)) - 
+      (1.*b*pow(kx,3)*kz*cos(kx*x)*cos(kz*z))/
+       (pow(beta + sin(kx*x),2)*(delta + sin(ky*y))*
+         pow(gamma + sin(kz*z),2)) - 
+      (1.*b*kx*pow(kz,3)*cos(kx*x)*cos(kz*z))/
+       (pow(beta + sin(kx*x),2)*(delta + sin(ky*y))*
+         pow(gamma + sin(kz*z),2)));
 
-  // Treat velocity as a vector
-  NumberArray<NDIM, ADScalar> U;
-
-  ADScalar x = ADScalar(x1,NumberArrayUnitVector<NDIM, 0, Scalar>::value());
-  ADScalar y = ADScalar(y1,NumberArrayUnitVector<NDIM, 1, Scalar>::value());
-  ADScalar z = ADScalar(z1,NumberArrayUnitVector<NDIM, 2, Scalar>::value());
-
-  // Arbitrary manufactured solutions
-  U[0]       = a * helper_f(beta,kx,x)                  * helper_g(delta,ky,y).derivatives()[1] * helper_h(gamma,kz,z).derivatives()[2];
-  U[1]       = b * helper_f(beta,kx,x).derivatives()[0] * helper_g(delta,ky,y)                  * helper_h(gamma,kz,z).derivatives()[2];
-  U[2]       = c * helper_f(beta,kx,x).derivatives()[0] * helper_g(delta,ky,y).derivatives()[1] * helper_h(gamma,kz,z);
-  ADScalar P = d * helper_f(beta,kx,x)                  * helper_g(delta,ky,y)                  * helper_h(gamma,kz,z);
-
-  // NS equation residuals
-  NumberArray<NDIM, Scalar> Q_u = 
-    raw_value(
-
-	      // convective term
-	      -divergence(U.outerproduct(U))
-
-	      // pressure
-	      - P.derivatives()
-
-	      // dissipation
-	      + nu * divergence(gradient(U)));
-
-  return -Q_u[1];
+  return -Q_v;
 
 }
 
 // w component of velocity source term
 template <typename Scalar>
-Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_w(Scalar x1, Scalar y1, Scalar z1)
+Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_w(Scalar x, Scalar y, Scalar z)
 {
-  typedef DualNumber<Scalar, NumberArray<NDIM, Scalar> > FirstDerivType;
-  typedef DualNumber<FirstDerivType, NumberArray<NDIM, FirstDerivType> > SecondDerivType;
-  typedef DualNumber<SecondDerivType, NumberArray<NDIM, SecondDerivType> > ThirdDerivType;
-  typedef ThirdDerivType ADScalar;
-
-  // Treat velocity as a vector
-  NumberArray<NDIM, ADScalar> U;
-
-  ADScalar x = ADScalar(x1,NumberArrayUnitVector<NDIM, 0, Scalar>::value());
-  ADScalar y = ADScalar(y1,NumberArrayUnitVector<NDIM, 1, Scalar>::value());
-  ADScalar z = ADScalar(z1,NumberArrayUnitVector<NDIM, 2, Scalar>::value());
-
-  // Arbitrary manufactured solutions
-  U[0]       = a * helper_f(beta,kx,x)                  * helper_g(delta,ky,y).derivatives()[1] * helper_h(gamma,kz,z).derivatives()[2];
-  U[1]       = b * helper_f(beta,kx,x).derivatives()[0] * helper_g(delta,ky,y)                  * helper_h(gamma,kz,z).derivatives()[2];
-  U[2]       = c * helper_f(beta,kx,x).derivatives()[0] * helper_g(delta,ky,y).derivatives()[1] * helper_h(gamma,kz,z);
-  ADScalar P = d * helper_f(beta,kx,x)                  * helper_g(delta,ky,y)                  * helper_h(gamma,kz,z);
-
-  // NS equation residuals
-  NumberArray<NDIM, Scalar> Q_u = 
-    raw_value(
-
-	      // convective term
-	      -divergence(U.outerproduct(U))
-
-	      // pressure
-	      - P.derivatives()
-
-	      // dissipation
-	      + nu * divergence(gradient(U)));
-
-  return -Q_u[2];
-
+  Scalar Q_w = 
+    (3.*a*c*pow(kx,2)*pow(ky,2)*kz*pow(cos(kx*x),2)*pow(cos(ky*y),2)*
+      cos(kz*z))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),3)) + 
+   (3.*b*c*pow(kx,2)*pow(ky,2)*kz*pow(cos(kx*x),2)*
+      pow(cos(ky*y),2)*cos(kz*z))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),3)) + 
+   (2.*pow(c,2)*pow(kx,2)*pow(ky,2)*kz*pow(cos(kx*x),2)*
+      pow(cos(ky*y),2)*cos(kz*z))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),3)) + 
+   (1.*a*c*pow(kx,2)*pow(ky,2)*kz*pow(cos(ky*y),2)*cos(kz*z)*
+      sin(kx*x))/
+    (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),4)*
+      pow(gamma + sin(kz*z),3)) + 
+   (1.*b*c*pow(kx,2)*pow(ky,2)*kz*pow(cos(kx*x),2)*cos(kz*z)*
+      sin(ky*y))/
+    (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),3)*
+      pow(gamma + sin(kz*z),3)) + 
+   (1.*d*kz*cos(kz*z))/
+    ((beta + sin(kx*x))*(delta + sin(ky*y))*pow(gamma + sin(kz*z),2)) + 
+   nu*((2.*c*kx*ky*pow(kz,2)*cos(kx*x)*cos(ky*y)*pow(cos(kz*z),2))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),3)) + 
+      (1.*c*kx*ky*pow(kz,2)*cos(kx*x)*cos(ky*y)*sin(kz*z))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*
+         pow(gamma + sin(kz*z),2)) + 
+      (6.*c*kx*pow(ky,3)*cos(kx*x)*pow(cos(ky*y),3))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),4)*
+         (gamma + sin(kz*z))) + 
+      (6.*c*kx*pow(ky,3)*cos(kx*x)*cos(ky*y)*sin(ky*y))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),3)*
+         (gamma + sin(kz*z))) + 
+      (6.*c*pow(kx,3)*ky*pow(cos(kx*x),3)*cos(ky*y))/
+       (pow(beta + sin(kx*x),4)*pow(delta + sin(ky*y),2)*
+         (gamma + sin(kz*z))) + 
+      (6.*c*pow(kx,3)*ky*cos(kx*x)*cos(ky*y)*sin(kx*x))/
+       (pow(beta + sin(kx*x),3)*pow(delta + sin(ky*y),2)*
+         (gamma + sin(kz*z))) - 
+      (1.*c*pow(kx,3)*ky*cos(kx*x)*cos(ky*y))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*
+         (gamma + sin(kz*z))) - 
+      (1.*c*kx*pow(ky,3)*cos(kx*x)*cos(ky*y))/
+       (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*
+         (gamma + sin(kz*z))));
+         
+  return -Q_w;
+  
 }
 
 
@@ -218,71 +249,34 @@ Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_q_w(Scalar
 // Analytical Terms
 // ----------------------------------------
 
-// helper functions
-template <typename Scalar, typename Scalar2>
-Scalar helper_f(Scalar2 beta, Scalar2 kx, Scalar x)
-{
-  Scalar func;
-  func = 1/(beta+std::sin(kx*x));
-  return func;
-}
-
-template <typename Scalar, typename Scalar2>
-Scalar helper_g(Scalar2 delta, Scalar2 ky, Scalar y)
-{
-  Scalar func;
-  func = 1/(delta+std::sin(ky*y));
-  return func;
-}
-  
-template <typename Scalar, typename Scalar2>
-Scalar helper_h(Scalar2 gamma, Scalar2 kz, Scalar z)
-{
-  Scalar func;
-  func = 1/(gamma+std::sin(kz*z));
-  return func;
-}
-
 //
 // main functions
 // 
 
 // example of a public method called from eval_exact_t
 template <typename Scalar>
-Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_u(Scalar x, Scalar y1, Scalar z1)
+Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_u(Scalar x, Scalar y, Scalar z)
 {
-  typedef DualNumber<Scalar, Scalar> OneDDerivType;
-  OneDDerivType y = OneDDerivType(y1,1);
-  OneDDerivType z = OneDDerivType(z1,1);
- 
-  Scalar exact_u;
-  exact_u =   a *  helper_f(beta,kx,x) * helper_g(delta,ky,y).derivatives() *  helper_h(gamma,kz,z).derivatives();
+  Scalar exact_u =   (a*ky*kz*cos(ky*y)*cos(kz*z))/
+   ((beta + sin(kx*x))*pow(delta + sin(ky*y),2)*pow(gamma + sin(kz*z),2));
   return exact_u;
 }
 
 // public method
 template <typename Scalar>
-Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_v(Scalar x1, Scalar y, Scalar z1)
+Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_v(Scalar x, Scalar y, Scalar z)
 {
-  typedef DualNumber<Scalar, Scalar> OneDDerivType;
-  OneDDerivType x = OneDDerivType(x1,1);
-  OneDDerivType z = OneDDerivType(z1,1);
-
-  Scalar exact_v;
-  exact_v = b * helper_f(beta,kx,x).derivatives() *  helper_g(delta,ky,y) * helper_h(gamma,kz,z).derivatives();
+  Scalar exact_v = (b*kx*kz*cos(kx*x)*cos(kz*z))/
+   (pow(beta + sin(kx*x),2)*(delta + sin(ky*y))*pow(gamma + sin(kz*z),2));
   return exact_v;
 }
 
 // public method
 template <typename Scalar>
-Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_w(Scalar x1, Scalar y1, Scalar z)
+Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_w(Scalar x, Scalar y, Scalar z)
 {
-  typedef DualNumber<Scalar, Scalar> OneDDerivType;
-  OneDDerivType x = OneDDerivType(x1,1);
-  OneDDerivType y = OneDDerivType(y1,1);
-
-  Scalar exact_w;
-  exact_w = c * helper_f(beta,kx,x).derivatives() * helper_g(delta,ky,y).derivatives() *  helper_h(gamma,kz,z);
+  Scalar exact_w = (c*kx*ky*cos(kx*x)*cos(ky*y))/
+   (pow(beta + sin(kx*x),2)*pow(delta + sin(ky*y),2)*(gamma + sin(kz*z)));
   return exact_w;
 }
 
@@ -290,8 +284,7 @@ Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_w(Sc
 template <typename Scalar>
 Scalar MASA::navierstokes_3d_incompressible_homogeneous<Scalar>::eval_exact_p(Scalar x, Scalar y, Scalar z)
 {
-
-  Scalar P = d *  helper_f(beta,kx,x) * helper_g(delta,ky,y) *  helper_h(gamma,kz,z);
+  Scalar P = (d)/((beta + sin(kx*x))*(delta + sin(ky*y))*(gamma + sin(kz*z)));
   return P;
 }
 
